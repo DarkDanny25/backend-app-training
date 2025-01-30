@@ -2,7 +2,6 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const dotenv = require('dotenv');
-const path = require('path');
 
 const userRoutes = require('./routes/user');
 const trainingRoutes = require('./routes/training');
@@ -14,9 +13,6 @@ const app = express();
 // Middleware para parseo de JSON y habilitación de CORS
 app.use(express.json());
 app.use(cors());
-
-// Configuración de ruta para archivos estáticos (subidas)
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Conexión a la base de datos MongoDB
 mongoose.connect(process.env.MONGODB_URI)
