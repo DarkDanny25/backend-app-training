@@ -4,12 +4,27 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/user');
 const { authenticate, authorizeAdmin, validateObjectId } = require('../middlewares/auth');
-
 const router = express.Router();
+
+// Expresión regular para validar la contraseña
+const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,20}$/;
+
+// Validar la contraseña antes de realizar cualquier acción con ella
+const validatePassword = (password) => {
+  if (!passwordRegex.test(password)) {
+    return { valid: false, message: 'La contraseña debe tener al menos 8 caracteres, una mayúscula, una minúscula, un número y un carácter especial (@$!%*?&).' };
+  }
+  return { valid: true };
+};
 
 // Registrar un nuevo usuario
 router.post('/register', async (req, res) => {
   const { name, email, password } = req.body;
+
+  const passwordValidation = validatePassword(password);
+  if (!passwordValidation.valid) {
+    return res.status(400).json({ error: passwordValidation.message });
+  }
 
   try {
     // Verificar si el usuario ya existe
@@ -25,15 +40,17 @@ router.post('/register', async (req, res) => {
     else if (email.endsWith('@managerZN.com')) role = 'gerente_zona';
     else return res.status(400).json({ error: 'Email no válido para asignar un rol' });
 
-    // Encriptar la contraseña y crear usuario
+    // Encriptar la contraseña
     const hashedPassword = await bcrypt.hash(password, 10);
+
     const newUser = new User({ name, email, password: hashedPassword, role });
     await newUser.save();
 
     // Generar token
     const token = jwt.sign({ user: { id: newUser._id } }, process.env.JWT_SECRET, { expiresIn: '10h' });
     res.status(201).json({ token });
-  } catch {
+  } catch (error) {
+    console.error("Error al registrar usuario:", error);
     res.status(500).json({ error: 'Error del servidor' });
   }
 });
@@ -46,9 +63,11 @@ router.post('/login', async (req, res) => {
     const user = await User.findOne({ email });
     if (!user) return res.status(400).json({ error: 'Usuario no encontrado' });
 
+    // Comparar las contraseñas
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return res.status(400).json({ error: 'Contraseña incorrecta' });
 
+    // Generar token
     const token = jwt.sign({ user: { id: user._id, role: user.role } }, process.env.JWT_SECRET, { expiresIn: '10h' });
     res.json({ token, role: user.role });
   } catch {
@@ -80,6 +99,11 @@ router.post('/forgot-password', async (req, res) => {
 router.post('/reset-password', async (req, res) => {
   const { token, newPassword } = req.body;
 
+  const passwordValidation = validatePassword(newPassword);
+  if (!passwordValidation.valid) {
+    return res.status(400).json({ error: passwordValidation.message });
+  }
+
   try {
     const user = await User.findOne({
       resetPasswordToken: token,
@@ -88,7 +112,6 @@ router.post('/reset-password', async (req, res) => {
 
     if (!user) return res.status(400).json({ error: 'Token inválido o expirado' });
 
-    // Cambiar la contraseña
     user.password = await bcrypt.hash(newPassword, 10);
     user.resetPasswordToken = undefined;
     user.resetPasswordExpires = undefined;
@@ -186,7 +209,14 @@ router.put('/profile', authenticate, async (req, res) => {
     const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ error: 'Usuario no encontrado' });
 
-    if (password) user.password = await bcrypt.hash(password, 10);
+    if (password) {
+      const passwordValidation = validatePassword(password);
+      if (!passwordValidation.valid) {
+        return res.status(400).json({ error: passwordValidation.message });
+      }
+      user.password = await bcrypt.hash(password, 10);
+    }
+
     user.name = name || user.name;
     user.email = email || user.email;
     await user.save();

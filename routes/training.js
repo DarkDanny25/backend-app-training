@@ -84,7 +84,6 @@ router.put('/:id', authenticate, authorizeAdmin, async (req, res) => {
     const training = await Training.findById(id);
     if (!training) return res.status(404).json({ error: 'Material de capacitación no encontrado' });
 
-    // Verificar si hubo cambios reales en los datos
     const updatedData = {
       title: title || training.title,
       description: description || training.description,
@@ -97,7 +96,6 @@ router.put('/:id', authenticate, authorizeAdmin, async (req, res) => {
       originalFileName: originalFileName || training.originalFileName,
     };
 
-    // Si no hubo cambios
     const hasChanges = Object.keys(updatedData).some((key) => 
       JSON.stringify(updatedData[key]) !== JSON.stringify(training[key])
     );
@@ -106,7 +104,6 @@ router.put('/:id', authenticate, authorizeAdmin, async (req, res) => {
       return res.status(400).json({ error: 'No se realizaron cambios en la capacitación' });
     }
 
-    // Actualizamos solo si hubo cambios
     Object.assign(training, updatedData);
     await training.save();
 

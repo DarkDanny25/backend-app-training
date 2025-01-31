@@ -1,7 +1,6 @@
 const express = require('express');
 const FAQ = require('../models/faq');
 const { authenticate, authorizeAdmin } = require('../middlewares/auth');
-
 const router = express.Router();
 
 // Crear FAQ (solo admin)
